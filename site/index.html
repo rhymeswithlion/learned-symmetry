@@ -1,0 +1,661 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Is Your Vision Model Secretly Cheating?</title>
+<meta name="description" content="Label-free tests of learned symmetry: an interactive summary.">
+<style>
+:root{
+  --bg:#f6f1e7; --panel:#fffaf0; --ink:#1c1a17; --muted:#6b655c; --line:#d9d0bf;
+  --cheat:#c93a22; --sound:#0d7466; --gold:#b98312; --cool:#2f6f9f; --shadow:0 1px 0 rgba(0,0,0,.04),0 12px 30px -18px rgba(60,40,10,.35);
+  --serif:"Iowan Old Style","Palatino Linotype",Palatino,Georgia,serif;
+  --sans:ui-sans-serif,system-ui,-apple-system,"Segoe UI",Helvetica,Arial,sans-serif;
+  --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#15130f; --panel:#1d1a15; --ink:#efe9dc; --muted:#a39c8f; --line:#35302720;
+    --line:#353027; --cheat:#ff6f52; --sound:#3fc7b1; --gold:#e3b04b; --cool:#6fb1e0; --shadow:0 12px 30px -18px rgba(0,0,0,.8);
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#15130f; --panel:#1d1a15; --ink:#efe9dc; --muted:#a39c8f; --line:#353027;
+  --cheat:#ff6f52; --sound:#3fc7b1; --gold:#e3b04b; --cool:#6fb1e0; --shadow:0 12px 30px -18px rgba(0,0,0,.8);
+}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--sans);font-size:17px;line-height:1.6;-webkit-font-smoothing:antialiased}
+a{color:inherit;text-decoration-color:var(--cheat);text-underline-offset:3px}
+.wrap{max-width:1080px;margin:0 auto;padding:0 20px}
+section{padding:84px 0;border-top:1px solid var(--line)}
+h1,h2{font-family:var(--serif);font-weight:600;letter-spacing:-.01em;line-height:1.08;margin:0}
+h1{font-size:clamp(40px,7vw,84px)}
+h2{font-size:clamp(28px,4vw,44px);max-width:20ch}
+h1 em,h2 em{font-style:italic;color:var(--cheat)}
+.kicker{font:600 12px/1 var(--sans);letter-spacing:.16em;text-transform:uppercase;color:var(--muted);margin:0 0 18px}
+.lede{font-size:clamp(18px,2.2vw,22px);max-width:56ch;color:var(--ink);margin:22px 0 0}
+p{max-width:64ch}
+.muted{color:var(--muted)}
+.small{font-size:13.5px;line-height:1.5;color:var(--muted)}
+.num{font-family:var(--serif);font-variant-numeric:tabular-nums}
+.grid2{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:48px;align-items:center}
+@media (max-width:820px){.grid2{grid-template-columns:1fr;gap:28px} section{padding:60px 0}}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:18px;box-shadow:var(--shadow);padding:22px}
+.reveal{opacity:0;transform:translateY(18px);transition:opacity .7s ease,transform .7s cubic-bezier(.2,.7,.2,1)}
+.reveal.in{opacity:1;transform:none}
+@media (prefers-reduced-motion: reduce){.reveal{opacity:1;transform:none;transition:none} html{scroll-behavior:auto}}
+button{font:inherit;color:inherit}
+.chips{display:flex;flex-wrap:wrap;gap:8px;margin:14px 0 0}
+.chip{border:1px solid var(--line);background:transparent;border-radius:999px;padding:6px 13px;font-size:14px;cursor:pointer;transition:background .2s,color .2s,border-color .2s}
+.chip:hover{border-color:var(--ink)}
+.chip[aria-pressed="true"]{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+.chip:focus-visible,canvas:focus-visible,.pose:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
+
+/* hero */
+header{padding:56px 0 70px;position:relative;overflow:hidden}
+.topline{display:flex;justify-content:space-between;gap:16px;align-items:center;margin-bottom:54px;font-size:13.5px;color:var(--muted)}
+.topline nav{display:flex;gap:18px;flex-wrap:wrap}
+.topline a{text-decoration:none}.topline a:hover{color:var(--ink)}
+#dial{width:100%;max-width:470px;aspect-ratio:1;display:block;margin:0 auto;touch-action:none;cursor:grab}
+#dial:active{cursor:grabbing}
+.readout{display:grid;grid-template-columns:auto 1fr;gap:6px 18px;align-items:baseline;margin-top:8px}
+.big{font:600 clamp(54px,8vw,86px)/1 var(--serif);font-variant-numeric:tabular-nums;transition:color .3s}
+.stat{display:flex;justify-content:space-between;gap:12px;border-top:1px solid var(--line);padding:9px 0;font-size:15px}
+.stat b{font-family:var(--serif);font-size:19px;font-variant-numeric:tabular-nums}
+.hint{display:inline-flex;gap:8px;align-items:center;font-size:13.5px;color:var(--muted)}
+.hint i{width:18px;height:18px;border:1.5px solid var(--muted);border-radius:50%;display:inline-block;position:relative;animation:nudge 2.4s ease-in-out infinite}
+.hint i::after{content:"";position:absolute;left:50%;top:-3px;width:5px;height:5px;margin-left:-2.5px;border-radius:50%;background:var(--cheat)}
+@keyframes nudge{0%,100%{transform:rotate(-35deg)}50%{transform:rotate(35deg)}}
+
+/* flips */
+.tiles{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}
+@media (max-width:560px){.tiles{grid-template-columns:repeat(2,minmax(0,1fr))}}
+.tile{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:14px 12px 12px;text-align:center}
+.tile svg{width:74%;max-width:120px;height:auto;transition:transform 1s cubic-bezier(.3,.8,.2,1)}
+.tile .pct{font:600 30px/1.1 var(--serif);font-variant-numeric:tabular-nums;margin-top:6px}
+.tile .lab{font-size:13px;color:var(--muted)}
+.meter{height:6px;border-radius:3px;background:var(--line);margin-top:10px;overflow:hidden}
+.meter span{display:block;height:100%;width:0;border-radius:3px;transition:width 1.2s cubic-bezier(.2,.7,.2,1)}
+svg text{font-family:var(--sans);fill:var(--ink)}
+.lat text.v{font-family:var(--serif);font-size:17px;font-weight:600}
+.lat text.n{font-size:12px;fill:var(--muted)}
+.lat line{stroke:var(--line);stroke-width:1.5}
+.lat line.up{stroke:var(--cheat);stroke-width:2.5}
+.lat text.lv{font-size:11px;fill:var(--muted);letter-spacing:.08em;text-transform:uppercase}
+.lat circle{transition:r .35s cubic-bezier(.2,.7,.2,1),fill .3s}
+
+/* playground */
+.scrollx{overflow-x:auto;-webkit-overflow-scrolling:touch}
+.swipe{display:none}
+@media (max-width:1090px){.swipe{display:block}}
+.pipe{display:flex;gap:6px;align-items:flex-start;overflow-x:auto;padding-bottom:6px;user-select:none;-webkit-user-select:none;--cw:44px}
+.stage{flex:none;width:min-content}
+.stage .cap{height:84px;overflow:hidden;margin:0 0 4px}
+.stage .cap h3{font:600 12px/1.25 var(--sans);letter-spacing:.04em;text-transform:uppercase;color:var(--ink);margin:0 0 3px}
+.stage .cap p{font:12px/1.35 var(--sans);color:var(--muted);margin:0;max-width:none}
+.stage .cap .m{font-family:var(--serif);font-style:italic;text-transform:none;letter-spacing:0}
+.arrow{flex:none;align-self:flex-start;margin-top:200px;color:var(--muted);font-size:18px;width:14px;text-align:center}
+.mat{display:grid;gap:3px;justify-content:start}
+.mat > *{min-height:25px;display:flex;align-items:center;justify-content:center;border-radius:6px;font:500 12.5px/1 var(--mono);font-variant-numeric:tabular-nums}
+.mat .gap{margin-top:9px}
+.mat .hd{font:500 12px/1.1 var(--sans);color:var(--muted);padding:0 6px;min-height:24px}
+.mat .hd.row{justify-content:flex-end;text-align:right;white-space:nowrap}
+.mat .hd.obj{writing-mode:vertical-rl;transform:rotate(180deg);padding:6px 0;font-size:11.5px}
+.mat .cell{color:var(--ink);border:1px solid color-mix(in srgb,var(--ink) 12%,transparent);transition:box-shadow .15s}
+.mat .cell.mean{background:transparent;border:1px dashed var(--muted);color:var(--muted)}
+.mat .cell.hl{box-shadow:0 0 0 2px var(--ink)}
+.mat .cell.orb{box-shadow:0 0 0 2px var(--cool)}
+.mat .bar{min-height:0;width:6px;border-radius:3px;margin:3px 0;justify-self:center;align-self:stretch}
+.mat .bar.gap{margin-top:12px}  /* the 9px that opens each object's rows, plus the bar's own 3px */
+.mat .sum{grid-column:1/-1;font:12px/1.2 var(--sans);color:var(--muted);margin-top:6px;min-height:0}
+.mat .sum b{font:600 13px var(--mono);color:var(--ink);margin-left:4px}
+.mat .grab{cursor:ns-resize;touch-action:none}
+.mat .hd.grab{border:1px dashed var(--line);color:var(--ink)}
+.mat .grab:hover,.mat .grab:focus-visible,.mat .grab.drag{outline:2px solid var(--ink);outline-offset:1px}
+.mat .hd.grab:not(.obj)::after{content:"↕";margin-left:4px;color:var(--muted);font-size:10px}
+.eq{display:grid;grid-template-columns:auto 1fr auto;gap:4px 10px;align-items:baseline;font-size:14px;margin:12px 0 0}
+.eq .m{font-family:var(--serif);font-style:italic;font-size:17px}
+.eq b{font:600 14px var(--mono);text-align:right}
+.split{display:flex;height:12px;border-radius:6px;overflow:hidden;background:var(--line);margin:12px 0 4px}
+.split span{display:block;height:100%;transition:width .4s}
+.hsel{margin-top:10px;border-top:1px solid var(--line);padding-top:12px}
+.hsel p{margin:0;font-size:14.5px;max-width:none}
+.glyphs{display:flex;flex-wrap:wrap;gap:10px;margin-top:10px}
+.glyphs figure{margin:0;width:76px;text-align:center;font-size:11.5px;line-height:1.25;color:var(--muted)}
+.glyphs svg{display:block;margin:0 auto 4px;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:8px}
+#hasse{min-width:560px}
+#hasse .node,#latPlay .node{cursor:pointer}
+#hasse .node:focus-visible,#latPlay .node:focus-visible{outline:none}
+#hasse .node:focus-visible circle.dot,#latPlay .node:focus-visible circle{stroke:var(--gold);stroke-width:3}
+.lat line.below{stroke:var(--cool);stroke-width:2.5}
+.dform{margin-top:18px;border-top:1px solid var(--line);padding-top:14px}
+.dform .big{font:500 clamp(19px,2.4vw,24px)/1.3 var(--serif);margin:8px 0 0}
+.dform .terms{font:400 12.5px/1.75 var(--mono);color:var(--muted);overflow-wrap:anywhere;margin:6px 0 0;font-variant-numeric:tabular-nums}
+.dform .terms b{color:var(--ink);font-weight:600}
+.dform .frac{display:inline-flex;flex-direction:column;vertical-align:middle;text-align:center;margin:0 4px}
+.dform .frac span:first-child{border-bottom:1.5px solid var(--ink);padding:0 6px 2px}
+.dform .frac span:last-child{padding:2px 6px 0}
+
+/* ring */
+#ring{width:100%;max-width:360px;height:auto;display:block;margin:0 auto}
+.pose{cursor:pointer}
+.formula{font:500 clamp(22px,3vw,30px)/1.3 var(--serif);margin:10px 0}
+
+/* dumbbells */
+#arms{width:100%;height:auto}
+#arms .row line.link{stroke-width:3;stroke-linecap:round;transition:stroke-dashoffset 1.1s cubic-bezier(.2,.7,.2,1)}
+#arms text.lab{font-size:14px}
+#arms text.val{font-size:12.5px;fill:var(--muted);font-variant-numeric:tabular-nums}
+#arms .axis text{font-size:11.5px;fill:var(--muted)}
+#arms .axis line{stroke:var(--line)}
+
+.pair{display:grid;grid-template-columns:1fr 1fr;gap:18px}
+@media (max-width:560px){.pair{grid-template-columns:1fr}}
+.cmp h3{font:600 15px/1.3 var(--sans);margin:0 0 12px}
+.cmprow{display:grid;grid-template-columns:9.5em 1fr 3.4em;gap:10px;align-items:center;font-size:14px;margin:8px 0}
+.cmprow .track{height:14px;border-radius:7px;background:var(--line);overflow:hidden}
+.cmprow .track span{display:block;height:100%;width:0;border-radius:7px;transition:width 1.2s cubic-bezier(.2,.7,.2,1)}
+.cmprow b{font-family:var(--serif);font-variant-numeric:tabular-nums;text-align:right}
+
+.cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:12px;margin-top:10px}
+.cardgroup{font:600 12px/1.3 var(--sans);letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin:24px 0 0}
+.card{display:block;text-decoration:none;background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:14px 16px;transition:transform .2s,border-color .2s}
+.card:hover{transform:translateY(-3px);border-color:var(--ink)}
+.card b{display:block;font-family:var(--mono);font-size:13.5px}
+.card span{font-size:13.5px;color:var(--muted)}
+button.card{font:inherit;text-align:left;cursor:pointer;color:inherit;width:100%}
+.card[aria-expanded="true"]{border-color:var(--ink);background:var(--bg)}
+.card[aria-expanded] b::after{content:" ▾";color:var(--muted)}
+.card[aria-expanded="true"] b::after{content:" ▴"}
+.specbox{margin-top:14px;background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:14px 16px}
+.specbox .bar2{display:flex;flex-wrap:wrap;gap:8px 16px;align-items:center;justify-content:space-between;font-size:13.5px}
+.specbox pre.spec{background:var(--bg);color:var(--ink);border:1px solid var(--line);max-height:560px;margin:12px 0 0;font-size:12.5px}
+.spec .c{color:var(--muted);opacity:1}
+.spec .k{color:var(--cool);font-weight:600}
+pre{background:var(--ink);color:var(--bg);border-radius:14px;padding:16px 18px;overflow:auto;font:13.5px/1.55 var(--mono);margin:18px 0 0}
+pre .c{opacity:.55}
+footer{padding:40px 0 70px;border-top:1px solid var(--line)}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="wrap">
+    <div class="topline">
+      <span>Brian Cruz · University of California, Berkeley, Department of Mathematics</span>
+      <nav><a href="#flips">A detector</a><a href="#defect">The test</a><a href="#lattice">The lattice</a><a href="#memorizer">A memorizer</a><a href="#cost">The cost</a><a href="paper.html" style="color:var(--ink);font-weight:600">Read the paper →</a></nav>
+    </div>
+    <div class="grid2">
+      <div>
+        <p class="kicker">Label-free tests of learned symmetry</p>
+        <h1>Is your vision model <em>secretly cheating?</em></h1>
+        <p class="lede">A network can score well on its test set and still know nothing about an object once it is rotated. The test set never shows it, because the test set has the same holes as the training data.</p>
+        <p class="hint" style="margin-top:26px"><i></i> Turn the shape. The ring shows the model's accuracy at each angle.</p>
+        <div class="chips" id="armchips" role="group" aria-label="Model"></div>
+        <p style="margin-top:26px"><a href="paper.html"><b>Read the paper</b></a> <span class="muted">— the full text, with the supplement.</span></p>
+      </div>
+      <div>
+        <canvas id="dial" width="940" height="940" tabindex="0" role="slider" aria-label="Rotation angle" aria-valuemin="0" aria-valuemax="359" aria-valuenow="0"></canvas>
+        <div class="panel" style="margin-top:14px">
+          <div class="readout">
+            <span class="big num" id="accNow">0.93</span>
+            <span><span id="armName">MLP</span>: accuracy at <b class="num" id="angNow">0°</b></span>
+          </div>
+          <div class="stat"><span>Accuracy on inputs similar to its training data</span><b id="accTrain"></b></div>
+          <div class="stat"><span>Accuracy over the full circle of rotations</span><b id="accFull"></b></div>
+          <div class="stat"><span class="muted">Best possible accuracy over the full circle</span><b id="accBest" class="muted"></b></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</header>
+
+<section id="flips">
+  <div class="wrap">
+    <p class="kicker reveal">1 · A published detector</p>
+    <h2 class="reveal">Trained with mirror images. <em>Never</em> shown upside down.</h2>
+    <p class="lede reveal">We asked a widely distributed object detector about 400 validation objects, each shown four ways. A normal test set holds only the first two views, so it cannot show the gap.</p>
+    <div class="tiles reveal" id="tiles" style="margin-top:34px"></div>
+    <div class="grid2" style="margin-top:56px">
+      <div class="reveal">
+        <h2 style="font-size:clamp(24px,3vw,32px)">Now take the labels away.</h2>
+        <p>The <b>invariance defect</b> compares the class scores of an image with their average over a set of flips. It is 0 when the scores are the same at every flip in the set and grows toward 1 as they differ, and it needs no labels.</p>
+        <p>Each circle is one set of flips. The mirror's defect is the smallest, yet it is still <b class="num" id="r2"></b> times the defect of shifting the image by a single pixel, so this detector is not mirror-invariant either. Nothing in its accuracy shows that.</p>
+              </div>
+      <div class="panel reveal"><svg class="lat" id="latDet" viewBox="0 0 420 372" role="img" aria-label="Defect at each set of flips"></svg></div>
+    </div>
+    <h2 class="reveal" style="font-size:clamp(24px,3vw,32px);margin-top:56px">Then train it with all four flips.</h2>
+    <p class="reveal">Fine-tuning with every flip and a consistency penalty lowers the vertical flip's defect, and accuracy under that flip rises with it. <a href="paper.html#sec-8">Section 8 in the paper →</a></p>
+    <div class="pair reveal" style="margin-top:22px">
+      <div class="panel cmp">
+        <h3>Fine-tuning the detector: defect under the vertical flip</h3>
+        <div id="ftDefect"></div>
+        <p class="small" style="margin-bottom:0">Showing all four flips with a consistency penalty about halves it (ratio <span class="num" id="ftRatio"></span>).</p>
+      </div>
+      <div class="panel cmp">
+        <h3>…and accuracy at the box, flipped top to bottom</h3>
+        <div id="ftAcc"></div>
+        <p class="small" style="margin-bottom:0" id="ftCost"></p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="defect">
+  <div class="wrap">
+    <p class="kicker reveal">2 · The test, hands on</p>
+    <h2 class="reveal">Drag the scores. Watch <em>where</em> invariance breaks.</h2>
+    <p class="lede reveal">Three objects, each at four flips, scored on three classes fill a table of twelve rows and three columns. The test centres it, averages each object's scores over the views a set of flips joins, and measures what the averaging took away: 0 when the flips change nothing, 1 when nothing survives them.</p>
+    <div class="panel reveal" style="margin-top:34px">
+      <div class="chips" id="presets" role="group" aria-label="Presets" style="margin:0 0 16px"></div>
+      <p class="small swipe" style="margin:0 0 8px">Swipe the tables sideways for steps ② to ⑤.</p>
+      <div class="pipe" id="pipe"></div>
+      <p class="small" style="margin:8px 0 0">Drag up or down. Dragging a view's label adds the same number to every class in that row, which ② removes; dragging a class's name adds it to the whole column, which ③ removes. Hover a number to see the values ④ averages it with.</p>
+    </div>
+    <div class="grid2" style="margin-top:18px;align-items:start">
+      <div class="panel reveal">
+        <div class="chips" id="which" role="group" aria-label="The set of flips the defect is taken over" style="margin:0"></div>
+        <div id="norms" class="dform" aria-live="off"></div>
+      </div>
+      <div class="panel reveal">
+        <svg class="lat" id="latPlay" viewBox="0 0 420 372" role="group" aria-label="Defect at each set of flips, live; choose a set of flips"></svg>
+        <p class="small" id="playNote" style="margin:6px 0 0"></p>
+        <p class="small" style="margin:6px 0 0">Click a circle to take the defect over that set of flips.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="lattice">
+  <div class="wrap">
+    <p class="kicker reveal">3 · Every subgroup at once</p>
+    <h2 class="reveal">A larger set of symmetries never has a <em>smaller defect.</em></h2>
+    <div class="grid2" style="margin-top:22px;align-items:start">
+      <div class="reveal">
+        <p>A set of transformations that is closed under composing and undoing them is a <b>group</b>, and a group inside another is its <b>subgroup</b>. A <b>Hasse diagram</b> draws every subgroup as a circle, the smaller ones lower, with a line from each subgroup up to the next larger ones that contain it.</p>
+        <p>The diagram below shows the ten subgroups of the eight symmetries of a square: four rotations and four flips. The four flips of the sections above are one of the circles in its third row.</p>
+      </div>
+      <div class="reveal">
+        <p>The defect is <b>monotone with respect to inclusion</b>. For subgroups <i>H</i> and <i>K</i> of the group <i>G</i>:</p>
+        <div class="panel" style="text-align:center;padding:16px 18px"><div class="formula" style="margin:0"><i>H</i> ≤ <i>K</i> ≤ <i>G</i> &nbsp;⟹&nbsp; δ(<i>H</i>) ≤ δ(<i>K</i>)</div>
+          <p class="small" style="margin:6px auto 0">with equality exactly when <i>R<sub>H</sub><span style="text-decoration:overline">f</span></i> is already <i>K</i>-invariant. <a href="paper.html#sec-3">Theorem 1 (iii), Section 3 →</a></p></div>
+        <p style="margin-top:16px">Along any line going up, the defect stays level or grows, so the lowest circles above zero name the symmetries that failed.</p>
+      </div>
+    </div>
+    <div class="panel reveal" style="max-width:880px;margin-top:26px">
+      <div class="scrollx"><svg class="lat" id="hasse" viewBox="0 -14 640 574" role="group" aria-label="Hasse diagram of the ten subgroups of the symmetries of a square, with the defect at each; choose a subgroup"></svg></div>
+      <div id="hasseSel" class="hsel" aria-live="polite"></div>
+    </div>
+  </div>
+</section>
+
+<section id="memorizer">
+  <div class="wrap">
+    <div class="grid2">
+      <div>
+        <p class="kicker reveal">4 · What cheating looks like</p>
+        <h2 class="reveal">A memorizer's defect has a <em>closed form.</em></h2>
+        <p class="lede reveal">The simplest classifier that is right at every pose it saw, and knows nothing of the rest, keeps one scale per pose. Trained with weight decay it ends with the same scale on every seen pose and zero on every hole.</p>
+        <p class="reveal">Click a pose, or drag the slider: the poses up to it, clockwise from the top, are the ones seen in training.</p>
+        <div class="chips reveal" id="kchips" role="group" aria-label="Number of poses"></div>
+        <p class="small reveal" style="margin-top:16px"><a href="paper.html#sec-5">Theorem 2, Section 5 in the paper →</a></p>
+      </div>
+      <div class="panel reveal" style="text-align:center">
+        <svg id="ring" viewBox="0 0 360 360" role="group" aria-label="Poses on an orbit"></svg>
+        <label class="small" style="display:flex;gap:10px;align-items:center;justify-content:center;margin:4px 0 0">seen <input type="range" id="seenSlider" min="0" max="8" step="1" value="2" style="width:min(240px,60%);accent-color:var(--ink)"></label>
+        <div class="formula">δ = √(1 − <span id="sN">2</span>/<span id="kN">8</span>) = <b id="dN" class="num"></b></div>
+        <div class="small" id="ringNote"></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="cost">
+  <div class="wrap">
+    <p class="kicker reveal">5 · When it costs accuracy</p>
+    <h2 class="reveal">Where the best possible answer is known, the cheat has a <em>price.</em></h2>
+    <p class="lede reveal">On synthetic renders of rotated shapes, the best rule for the training data and the best rule for deployment can both be computed. Hollow dots are accuracy on inputs like the training data; filled dots, over the full circle.</p>
+    <div class="panel reveal" style="margin-top:30px"><svg id="arms" viewBox="0 0 860 330" role="img" aria-label="Accuracy on the training distribution and over the full circle, by model"></svg></div>
+    <p class="reveal" style="margin-top:22px">The plain network is within a hair of the best rule for its training data, and that rule is itself a cheat: it is the right answer to the wrong question. The share of inputs whose predicted class a rotation changes bounds how much accuracy is lost, and it too needs no labels. <a href="paper.html#sec-6">Section 6 in the paper →</a></p>
+
+  </div>
+</section>
+
+
+<footer><div class="wrap small">Numbers on this page are read from the values the experiments recorded; a few are copied from the paper's text and marked there. Illustrations of objects are drawn for the page.</div></footer>
+
+<script src="data.js"></script>
+<script>
+(() => {
+const D = window.DATA, $ = s => document.querySelector(s), NS = "http://www.w3.org/2000/svg";
+const reduce = matchMedia("(prefers-reduced-motion: reduce)").matches;
+const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+const el = (tag, attrs = {}, text) => { const e = document.createElementNS(NS, tag); for (const k in attrs) e.setAttribute(k, attrs[k]); if (text != null) e.textContent = text; return e; };
+const f2 = x => x.toFixed(2), f3 = x => x.toFixed(3), pct = x => (100 * x).toFixed(1) + "%";
+const hex = h => [1, 3, 5].map(i => parseInt(h.slice(i, i + 2), 16));
+const mix = (a, b, t) => { const A = hex(a), B = hex(b); return "rgb(" + A.map((v, i) => Math.round(v + (B[i] - v) * t)).join(",") + ")"; };
+const CHANCE = 1 / 12;
+const heat = acc => mix(css("--cheat"), css("--sound"), Math.max(0, Math.min(1, (acc - CHANCE) / (1 - CHANCE))));
+
+/* ---------- hero dial ---------- */
+const ARMS = [["plain", "MLP"], ["aug", "MLP, rotated inputs"], ["pool", "feature pooling"], ["lse", "log-mean-exp head"]];
+let arm = "plain", theta = 0, auto = !reduce, shown = D.rotation.arms.plain.by_angle.slice();
+const cv = $("#dial"), ctx = cv.getContext("2d");
+const F = [[1, 0], [2, 0], [0, 1], [1, 1], [1, 2]];
+function drawDial() {
+  const W = cv.width, c = W / 2, s = W / 470, r0 = 100 * s, L = 96 * s, bin = D.rotation.bin_degrees, rad = d => (d + 90) * Math.PI / 180;  // upright, angle 0, is at the bottom
+  ctx.clearRect(0, 0, W, W);
+  const ink = css("--ink"), line = css("--line"), muted = css("--muted"), gold = css("--gold");
+  // reference rings: chance and the best possible over the full circle
+  const best = D.rotation.arms.f_star.full;
+  [[CHANCE, [3 * s, 5 * s], line], [best, [8 * s, 6 * s], muted], [1, [], line]].forEach(([v, dash, col]) => { ctx.beginPath(); ctx.setLineDash(dash); ctx.strokeStyle = col; ctx.lineWidth = 1.2 * s; ctx.arc(c, c, r0 + L * v, 0, 7); ctx.stroke(); });
+  ctx.setLineDash([]);
+  // the training window
+  const w = D.rotation.window_degrees;
+  ctx.beginPath(); ctx.strokeStyle = gold; ctx.lineWidth = 5 * s; ctx.lineCap = "round"; ctx.arc(c, c, r0 + L + 16 * s, rad(-w), rad(w)); ctx.stroke(); ctx.lineCap = "butt";
+  ctx.fillStyle = gold; ctx.font = `600 ${12.5 * s}px ui-sans-serif,system-ui,sans-serif`; ctx.textAlign = "center"; ctx.fillText("SEEN IN TRAINING", c, c + r0 + L + 38 * s);
+  // wedges
+  const cur = Math.floor(((theta % 360) + 360) % 360 / bin);
+  shown.forEach((a, i) => {
+    ctx.beginPath(); ctx.arc(c, c, r0 + L * a, rad(i * bin + 1), rad((i + 1) * bin - 1)); ctx.arc(c, c, r0, rad((i + 1) * bin - 1), rad(i * bin + 1), true); ctx.closePath();
+    ctx.globalAlpha = i === cur ? 1 : .78; ctx.fillStyle = heat(a); ctx.fill(); ctx.globalAlpha = 1;
+    if (i === cur) { ctx.strokeStyle = ink; ctx.lineWidth = 2.5 * s; ctx.stroke(); }
+  });
+  // labels on the reference rings
+  ctx.fillStyle = muted; ctx.font = `${11 * s}px ui-sans-serif,system-ui,sans-serif`; ctx.textAlign = "left";
+  ctx.fillText("best possible " + f2(best), c + 6 * s, c - r0 - L * best + 13 * s); ctx.fillText("1.0", c + 6 * s, c - r0 - L - 5 * s);
+  // the shape
+  ctx.save(); ctx.translate(c, c); ctx.rotate(theta * Math.PI / 180);
+  const cell = 34 * s; ctx.fillStyle = ink;
+  F.forEach(([x, y]) => { ctx.beginPath(); ctx.roundRect((x - 1.5) * cell + 1.5 * s, (y - 1.5) * cell + 1.5 * s, cell - 3 * s, cell - 3 * s, 5 * s); ctx.fill(); });
+  ctx.restore();
+  // pointer
+  const t = theta * Math.PI / 180; ctx.beginPath(); ctx.strokeStyle = ink; ctx.lineWidth = 2 * s; ctx.moveTo(c - Math.sin(t) * (r0 - 12 * s), c + Math.cos(t) * (r0 - 12 * s)); ctx.lineTo(c - Math.sin(t) * (r0 - 2 * s), c + Math.cos(t) * (r0 - 2 * s)); ctx.stroke();
+}
+function readout() {
+  const A = D.rotation.arms[arm], a = ((theta % 360) + 360) % 360, i = Math.floor(a / D.rotation.bin_degrees), acc = A.by_angle[i];
+  $("#accNow").textContent = f2(acc); $("#accNow").style.color = heat(acc);
+  $("#angNow").textContent = Math.round(a) + "°"; cv.setAttribute("aria-valuenow", Math.round(a));
+  $("#armName").textContent = ARMS.find(x => x[0] === arm)[1];
+  $("#accTrain").textContent = f3(A.train); $("#accFull").textContent = f3(A.full); $("#accBest").textContent = f3(D.rotation.arms.f_star.full);
+}
+let last = 0;
+function tick(ts) {
+  const dt = Math.min(50, ts - last || 16); last = ts; let moving = false;
+  if (auto) { theta = (theta + dt * .014) % 360; moving = true; }
+  const target = D.rotation.arms[arm].by_angle;
+  shown = shown.map((v, i) => { const d = target[i] - v; if (Math.abs(d) > .001) { moving = true; return v + d * Math.min(1, dt * .012); } return target[i]; });
+  drawDial(); readout();
+  if (moving) requestAnimationFrame(tick); else running = false;
+}
+let running = false; const kick = () => { if (!running) { running = true; last = 0; requestAnimationFrame(tick); } };
+const setFromEvent = e => { const r = cv.getBoundingClientRect(); theta = (Math.atan2(-(e.clientX - r.left - r.width / 2), e.clientY - r.top - r.height / 2) * 180 / Math.PI + 360) % 360; auto = false; kick(); };
+cv.addEventListener("pointerdown", e => { cv.setPointerCapture(e.pointerId); setFromEvent(e); });
+cv.addEventListener("pointermove", e => { if (e.buttons) setFromEvent(e); });
+cv.addEventListener("keydown", e => { const d = { ArrowRight: 15, ArrowUp: 15, ArrowLeft: -15, ArrowDown: -15 }[e.key]; if (d) { theta = (theta + d + 360) % 360; auto = false; kick(); e.preventDefault(); } });
+ARMS.forEach(([k, name]) => { const b = document.createElement("button"); b.className = "chip"; b.textContent = name; b.setAttribute("aria-pressed", k === arm); b.onclick = () => { arm = k; document.querySelectorAll("#armchips .chip").forEach(x => x.setAttribute("aria-pressed", x === b)); kick(); }; $("#armchips").append(b); });
+matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => { kick(); renderAll(); });
+kick();
+
+/* ---------- flips: tiles ---------- */
+const mug = () => `<svg viewBox="0 0 120 120" aria-hidden="true"><g fill="none" stroke="currentColor" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"><path d="M28 46h50v36a14 14 0 0 1-14 14H42a14 14 0 0 1-14-14z" fill="currentColor" fill-opacity=".12"/><path d="M78 54h8a11 11 0 0 1 0 22h-8"/><path d="M42 32c-4-6 4-8 0-14M58 32c-4-6 4-8 0-14"/><path d="M20 104h66"/></g></svg>`;
+const VIEWS = [["e", "as photographed", ""], ["h", "mirrored", "scaleX(-1)"], ["v", "flipped top to bottom", "scaleY(-1)"], ["hv", "half turn", "rotate(180deg)"]];
+VIEWS.forEach(([g, name]) => { const a = D.detector.acc[g], t = document.createElement("div"); t.className = "tile"; t.innerHTML = `${mug()}<div class="pct num">${pct(a)}</div><div class="lab">${name}</div><div class="meter"><span></span></div>`; t.dataset.g = g; $("#tiles").append(t); });
+function showTiles() { document.querySelectorAll("#tiles .tile").forEach((t, i) => { const [g, , tf] = VIEWS[i], a = D.detector.acc[g]; setTimeout(() => { t.querySelector("svg").style.transform = tf; const m = t.querySelector(".meter span"); m.style.width = 100 * a + "%"; m.style.background = a > .5 ? css("--sound") : css("--cheat"); t.querySelector(".pct").style.color = a > .5 ? "" : css("--cheat"); }, reduce ? 0 : 250 * i); }); }
+
+/* ---------- lattice of the four flips ---------- */
+const NODES = { e: [210, 318, "identity"], h: [76, 190, "mirror"], v: [210, 190, "top–bottom flip"], hv: [344, 190, "half turn"], V: [210, 50, "all four flips"] };
+function lattice(svg, val, note, pick, sel) {
+  svg.innerHTML = "";
+  ["h", "v", "hv"].forEach(k => { svg.append(el("line", { x1: NODES.e[0], y1: NODES.e[1], x2: NODES[k][0], y2: NODES[k][1], class: sel && (sel === "V" || sel === k) ? "below" : "" }), el("line", { x1: NODES.V[0], y1: NODES.V[1], x2: NODES[k][0], y2: NODES[k][1], class: sel === "V" ? "below" : "" })); });
+  const max = Math.max(.3, ...Object.values(val));
+  for (const k in NODES) {
+    const [x, y, name] = NODES[k], d = val[k] || 0, r = 6 + 24 * Math.sqrt(d / max);
+    const g = el("g"); g.append(el("title", {}, `${name}: defect ${f3(d)}${note && note[k] ? " " + note[k] : ""}`));
+    if (pick && k !== "e") {
+      g.setAttribute("class", "node"); g.setAttribute("tabindex", 0); g.setAttribute("role", "radio"); g.setAttribute("aria-checked", k === sel); g.setAttribute("aria-label", `${name}, defect ${f3(d)}`);
+      g.addEventListener("click", () => pick(k)); g.addEventListener("keydown", e => { if (e.key === " " || e.key === "Enter") { pick(k); e.preventDefault(); } });
+      g.append(el("circle", { cx: x, cy: y, r: Math.max(r, 20) + 6, fill: "transparent" }));
+      if (k === sel) g.append(el("circle", { cx: x, cy: y, r: r + 5, fill: "none", stroke: css("--ink"), "stroke-width": 2 }));
+    }
+    g.append(el("circle", { cx: x, cy: y, r, fill: d < 1e-9 ? css("--sound") : mix(css("--sound"), css("--cheat"), Math.min(1, d / max)), "fill-opacity": .9 }));
+    g.append(el("text", { x, y: y + r + 20, "text-anchor": "middle", class: "v" }, f3(d)));
+    g.append(el("text", { x, y: y + r + 35, "text-anchor": "middle", class: "n" }, name));
+    if (note && note[k]) g.append(el("text", { x, y: y + r + 50, "text-anchor": "middle", class: "n" }, note[k]));
+    svg.append(g);
+  }
+}
+function renderDet() {
+  const d = D.detector.defect, iv = x => `[${f3(x[1])}, ${f3(x[2])}]`;
+  lattice($("#latDet"), { e: 0, h: d.h[0], v: d.v[0], hv: d.hv[0], V: d.V[0] }, { h: iv(d.h), v: iv(d.v), hv: iv(d.hv), V: iv(d.V) });
+  $("#latDet").append(el("text", { x: 14, y: 362, class: "n" }, `floor (one-pixel shift): ${f3(D.detector.floor[0])}`));
+  $("#r2").textContent = f2(D.detector.mirror_over_floor[0]);
+}
+
+/* ---------- defect playground: three objects at four flips, three classes ---------- */
+const POSES = ["as is", "mirrored", "flipped", "half turn"], CLS = ["mug", "bowl", "vase"], OBJ = ["1st object", "2nd object", "3rd object"];
+const ORB = { e: [[0], [1], [2], [3]], h: [[0, 1], [2, 3]], v: [[0, 2], [1, 3]], hv: [[0, 3], [1, 2]], V: [[0, 1, 2, 3]] };  // the views each set of flips joins, within one object
+const orbitOf = (k, i) => { const o = i - i % 4; return ORB[k].find(b => b.includes(i % 4)).map(p => o + p); };
+const avg = xs => xs.reduce((a, b) => a + b, 0) / xs.length;
+const rowCentre = f0 => f0.map(r => { const m = avg(r); return r.map(v => v - m); });  // a row's mean over the classes changes no prediction
+const colMeans = f0 => CLS.map((_, c) => avg(f0.map(r => r[c])));
+const colCentre = f0 => { const m = colMeans(f0); return f0.map(r => r.map((v, c) => v - m[c])); };  // so that a class bias does not count
+const average = (k, g) => g.map((r, i) => r.map((_, c) => avg(orbitOf(k, i).map(j => g[j][c]))));
+const sq = g => g.flat().reduce((t, v) => t + v * v, 0), size = g => Math.sqrt(sq(g));
+const steps = (f0, k) => { const a = rowCentre(f0), b = colCentre(a), p = average(k, b); return { a, b, p, r: b.map((row, i) => row.map((v, c) => v - p[i][c])) }; };
+const defect = (k, f0 = f) => { const { b, r } = steps(f0, k), n = sq(b); return n < 1e-12 ? 0 : Math.sqrt(sq(r) / n); };
+const tint = v => `color-mix(in srgb, var(${v >= 0 ? "--gold" : "--cool"}) ${Math.round(Math.min(1, Math.abs(v)) * 78)}%, var(--panel))`;
+const sg = x => (Math.abs(x) < .005 ? "0.00" : f2(x)).replace("-", "−");
+const WHICH = [["V", "all four flips"], ["h", "mirror"], ["v", "top–bottom flip"], ["hv", "half turn"]];
+const ORBCOL = ["--gold", "--cool", "--sound", "--cheat"];
+const build = (fn) => Array.from({ length: 12 }, (_, i) => CLS.map((_, c) => fn(Math.floor(i / 4), i % 4, c)));
+let f = build((o, p, c) => c === o && p < 2 ? 1 : 0), which = "V", T = [], meanCells = [], footCells = [], bars = [], sums = [];
+const STAGES = [
+  ["① Scores", "Each row is one view of one object. Dashed: the row's mean."],
+  ["② Centred at each view", "① less the row's mean. Dashed: each class's mean over the 12 rows."],
+  ["③ Centred twice, <span class=m>f̄</span>", "② less the dashed row."],
+  ["④ Averaged, <span class=m>R<sub>H</sub>f̄</span>", "Each value of ③ replaced by its mean over the views the flips join, marked by the bars."],
+  ["⑤ The rest, <span class=m>f̄ − R<sub>H</sub>f̄</span>", "③ less ④: the part the flips change."],
+];
+function buildPipe() {
+  const pipe = $("#pipe"), div = (cls, text) => { const d = document.createElement("div"); d.className = cls; if (text != null) d.textContent = text; return d; };
+  const grab = (node, targets, label) => {  // drag up or down to add to every target; arrows step by 0.05
+    node.classList.add("grab"); node.tabIndex = 0; node.setAttribute("role", "slider"); node.setAttribute("aria-label", label);
+    let y0 = null, base;
+    const start = () => base = targets.map(([i, c]) => f[i][c]);
+    const add = d => { d = Math.round(d * 20) / 20; targets.forEach(([i, c], k) => f[i][c] = Math.round(Math.max(-1, Math.min(1, base[k] + d)) * 100) / 100); renderPlay(); };
+    node.addEventListener("pointerdown", e => { node.setPointerCapture(e.pointerId); y0 = e.clientY; start(); node.classList.add("drag"); e.preventDefault(); node.focus({ preventScroll: true }); });
+    node.addEventListener("pointermove", e => { if (y0 != null) add((y0 - e.clientY) / 110); });
+    const end = () => { y0 = null; node.classList.remove("drag"); };
+    node.addEventListener("pointerup", end); node.addEventListener("pointercancel", end);
+    node.addEventListener("keydown", e => { const d = { ArrowUp: .05, ArrowRight: .05, ArrowDown: -.05, ArrowLeft: -.05 }[e.key]; if (d) { start(); add(d); e.preventDefault(); } });
+  };
+  const ROWS = Array.from({ length: 12 }, (_, i) => i), all = (pred) => ROWS.flatMap(i => CLS.map((_, c) => [i, c])).filter(pred);
+  STAGES.forEach(([title, op], t) => {
+    if (t) pipe.append(div("arrow", "→"));
+    const st = div("stage"), cap = div("cap"); cap.innerHTML = `<h3>${title}</h3><p>${op}</p>`; st.append(cap);
+    const m = div("mat"); m.setAttribute("role", "group"); m.setAttribute("aria-label", title.replace(/<[^>]+>/g, ""));
+    m.style.gridTemplateColumns = t === 0 ? "auto auto repeat(4,var(--cw))" : t === 3 ? "10px repeat(3,var(--cw))" : "repeat(3,var(--cw))";
+    if (t === 0) m.append(div("hd"), div("hd"));
+    if (t === 3) m.append(div("hd"));
+    CLS.forEach((n, c) => { const h = div("hd", n); if (t === 0) grab(h, all(([, cc]) => cc === c), `every ${n} score`); m.append(h); });
+    if (t === 0) m.append(div("hd", "mean"));
+    T[t] = ROWS.map(i => {
+      const o = Math.floor(i / 4), p = i % 4, gap = p === 0 && o > 0 ? " gap" : "";
+      if (t === 0 && p === 0) { const h = div("hd obj grab" + gap, OBJ[o]); h.style.gridRow = "span 4"; grab(h, all(([ii]) => Math.floor(ii / 4) === o), `every score, ${OBJ[o]}`); m.append(h); }
+      if (t === 0) { const h = div("hd row" + gap, POSES[p]); grab(h, CLS.map((_, c) => [i, c]), `every score, ${OBJ[o]} ${POSES[p]}`); m.append(h); }
+      if (t === 3) { const b = div("bar" + gap); bars[i] = b; m.append(b); }
+      const cells = CLS.map((n, c) => { const d = div("cell" + gap); d.dataset.i = i; d.dataset.c = c; if (t === 0) grab(d, [[i, c]], `${n} score, ${OBJ[o]} ${POSES[p]}`); m.append(d); return d; });
+      if (t === 0) { const d = div("cell mean" + gap); meanCells[i] = d; m.append(d); }
+      return cells;
+    });
+    if (t === 1) CLS.forEach((_, c) => { const d = div("cell mean gap"); footCells[c] = d; m.append(d); });
+    if (t >= 2) { const s = div("sum"); sums[t] = s; m.append(s); }
+    st.append(m); pipe.append(st);
+  });
+  // hover: the same value in every table, and in ③ and ④ the values averaged with it
+  const clear = () => pipe.querySelectorAll(".hl,.orb").forEach(x => x.classList.remove("hl", "orb"));
+  pipe.addEventListener("pointerover", e => { const d = e.target.closest(".cell[data-i]"); clear(); if (!d) return; const i = +d.dataset.i, c = +d.dataset.c; orbitOf(which, i).forEach(j => [2, 3].forEach(t => T[t][j][c].classList.add("orb"))); T.forEach(rows => rows[i][c].classList.add("hl")); });
+  pipe.addEventListener("pointerleave", clear);
+  WHICH.forEach(([k, name]) => { const b = document.createElement("button"); b.className = "chip"; b.textContent = name; b.dataset.k = k; b.onclick = () => { which = k; renderPlay(); }; $("#which").append(b); });
+}
+function renderPlay() {
+  if (!T.length) buildPipe();
+  const { a, b, p, r } = steps(f, which), mats = [f, a, b, p, r];
+  mats.forEach((g, t) => g.forEach((row, i) => row.forEach((v, c) => { const d = T[t][i][c]; d.textContent = sg(v); d.style.background = tint(v); if (!t) { d.setAttribute("aria-valuemin", -1); d.setAttribute("aria-valuemax", 1); d.setAttribute("aria-valuenow", v.toFixed(2)); } })));
+  f.forEach((row, i) => meanCells[i].textContent = sg(avg(row)));
+  colMeans(a).forEach((v, c) => footCells[c].textContent = sg(v));
+  bars.forEach((bar, i) => { const k = ORB[which].findIndex(o => o.includes(i % 4)); bar.style.background = `var(${ORBCOL[k]})`; bar.title = `joined with: ${orbitOf(which, i).map(j => POSES[j % 4]).join(", ")}`; });
+  const n = sq(b), q = sq(p), z = sq(r), name = WHICH.find(w => w[0] === which)[1];
+  [, , n, q, z].forEach((v, t) => { if (t >= 2) sums[t].innerHTML = `squares, summed <b>${f3(v)}</b>`; });
+  document.querySelectorAll("#which .chip").forEach(x => x.setAttribute("aria-pressed", x.dataset.k === which));
+  $("#norms").innerHTML = n < 1e-12
+    ? `<p class="small" style="margin:12px 0 0">Every value of ③ is 0: the scores carry nothing but row and class means, so there is nothing to divide by.</p>`
+    : `<p class="small" style="margin:0">The flips <b style="color:var(--ink)">H</b> are the ${name === "all four flips" ? "four flips" : name + " and doing nothing"}. Sum the squares of each table:</p>
+       <div class="eq"><span class="m">‖f̄‖²</span><span class="muted">③, everything</span><b>${f3(n)}</b>
+         <span class="m">‖R<sub>H</sub>f̄‖²</span><span class="muted">④, the part the flips keep</span><b>${f3(q)}</b>
+         <span class="m">‖f̄ − R<sub>H</sub>f̄‖²</span><span class="muted">⑤, the part they change</span><b>${f3(z)}</b></div>
+       <div class="split" role="img" aria-label="${f3(q)} kept and ${f3(z)} changed, out of ${f3(n)}"><span style="width:${100 * q / n}%;background:var(--sound)"></span><span style="width:${100 * z / n}%;background:var(--cheat)"></span></div>
+       <p class="small" style="margin:0">④ and ⑤ split ③ exactly: ${f3(q)} + ${f3(z)} = ${f3(n)}, because averaging over the flips is an orthogonal projection (Theorem 1).</p>
+       <p class="big">defect = √(${f3(z)} / ${f3(n)}) = <b class="num" style="color:${z / n < 1e-12 ? css("--sound") : css("--cheat")}">${f3(Math.sqrt(z / n))}</b></p>`;
+  const val = { e: 0, h: defect("h"), v: defect("v"), hv: defect("hv"), V: defect("V") };
+  lattice($("#latPlay"), val, null, k => { which = k; renderPlay(); $(`#latPlay .node[aria-checked="true"]`)?.focus({ preventScroll: true }); }, which);
+  const zero = ["h", "v", "hv"].filter(k => val[k] < 1e-9).map(k => NODES[k][2]);
+  $("#playNote").textContent = n < 1e-12 ? "Nothing is left after centring, so there is nothing to measure." : val.V < 1e-9 ? "The same scores at all four flips of every object: invariant, defect 0 everywhere." : zero.length ? `Invariant under the ${zero.join(" and the ")}, and not under the rest.` : "Not invariant under any of the flips.";
+}
+const PRESETS = [
+  ["A memorizer that saw two views", (o, p, c) => c === o && p < 2 ? 1 : 0],
+  ["Invariant", (o, p, c) => [[.8, .1, -.2], [-.1, .7, 0], [0, .2, .9]][o][c]],
+  ["Mirror only", (o, p, c) => [[[.9, 0, -.3], [-.2, .7, .1]], [[0, .8, .1], [.5, .1, -.4]], [[-.2, .1, .8], [.3, .5, -.1]]][o][p >> 1][c]],
+  ["Half turn only", (o, p, c) => [[[.9, -.2, 0], [0, .6, -.3]], [[.1, .9, -.2], [.4, 0, .3]], [[-.3, .2, .9], [.6, -.1, .2]]][o][p === 0 || p === 3 ? 0 : 1][c]],
+  ["Nothing shared", (o, p, c) => Math.round(Math.sin(12.9898 * (12 * o + 3 * p + c + 1)) * 43758.5453 % 1 * 100) / 100],
+  ["A class bias only", (o, p, c) => c === 0 ? .6 : 0],
+];
+PRESETS.forEach(([name, fn]) => { const b = document.createElement("button"); b.className = "chip"; b.textContent = name; b.onclick = () => { f = build(fn); renderPlay(); }; $("#presets").append(b); });
+
+/* ---------- Hasse diagram: the subgroups of a square's symmetries ---------- */
+(() => {
+  const mul = (a, b) => [a[0] * b[0] + a[1] * b[2], a[0] * b[1] + a[1] * b[3], a[2] * b[0] + a[3] * b[2], a[2] * b[1] + a[3] * b[3]];
+  const I = [1, 0, 0, 1], R = [0, -1, 1, 0], S = [-1, 0, 0, 1], key = m => m.join();
+  const span = gens => { let els = [I]; for (let grew = true; grew;) { grew = false; for (const a of els) for (const g of gens) { const c = mul(g, a); if (!els.some(e => key(e) === key(c))) { els.push(c); grew = true; } } } return els; };
+  const G = span([R, S]), R2 = mul(R, R), R3 = mul(R2, R), SR = mul(S, R), SR2 = mul(S, R2), SR3 = mul(SR2, R);
+  const NAME = { [key(I)]: "identity", [key(R)]: "quarter turn", [key(R2)]: "half turn", [key(R3)]: "three-quarter turn", [key(S)]: "mirror", [key(SR2)]: "top–bottom flip", [key(SR)]: "diagonal flip", [key(SR3)]: "other diagonal flip" };
+  const ORDER = [I, R, R2, R3, S, SR2, SR, SR3].map(key);
+  const raw = m => m[3] === 1 ? [1, 0, 0] : m[3] === -1 ? [.6, .4, 0] : [.2, .4, .4];  // three class scores, by where the top (0, 1) is sent: up, down, sideways
+  const score = m => rowCentre([raw(m)])[0];
+  const norm = size(G.map(score));
+  const defectOf = H => { let rest = 0; for (const g of G) { const s = score(g); s.forEach((v, c) => { const mean = H.reduce((t, h) => t + score(mul(h, g))[c], 0) / H.length; rest += (v - mean) ** 2; }); } return Math.sqrt(rest) / norm; };
+  const N = {
+    e: [320, 490, "identity only", []],
+    s: [70, 340, "mirror", [S]], t: [195, 340, "top–bottom flip", [SR2]], h: [320, 340, "half turn", [R2]], d1: [445, 340, "diagonal flip", [SR]], d2: [570, 340, "other diagonal flip", [SR3]],
+    K: [170, 190, "the four flips", [S, R2]], C: [320, 190, "quarter turns", [R]], K2: [470, 190, "half turn + diagonal flips", [SR, R2]],
+    D: [320, 40, "all eight", [R, S]],
+  };
+  const E = [["e", "s"], ["e", "t"], ["e", "h"], ["e", "d1"], ["e", "d2"], ["s", "K"], ["t", "K"], ["h", "K"], ["h", "C"], ["h", "K2"], ["d1", "K2"], ["d2", "K2"], ["K", "D"], ["C", "D"], ["K2", "D"]];
+  const els = {}, val = {}; let max = 0;
+  for (const k in N) { const H = span(N[k][3]); els[k] = ORDER.filter(x => H.some(h => key(h) === x)); val[k] = defectOf(H); max = Math.max(max, val[k]); }
+  const inside = (a, b) => els[a].every(x => els[b].includes(x));  // a is a subgroup of b
+  const glyph = k => { const m = k.split(",").map(Number), s = el("svg", { viewBox: "-2 -2 4 4", width: 46, height: 46, "aria-hidden": "true" }), g = el("g", { transform: `matrix(${m[0]} ${m[2]} ${m[1]} ${m[3]} 0 0)` });
+    [[1, 0], [2, 0], [0, 1], [1, 1], [1, 2]].forEach(([x, y]) => g.append(el("rect", { x: x - 1.5 + .07, y: y - 1.5 + .07, width: .86, height: .86, rx: .14, fill: "currentColor" }))); s.append(g); return s; };
+  let sel = "K";
+  const svg = $("#hasse");
+  function draw() {
+    svg.innerHTML = "";
+    [[490, "1 element"], [340, "2 elements"], [190, "4 elements"], [40, "8 elements"]].forEach(([y, t]) => svg.append(el("text", { x: 4, y: y - 34, class: "lv" }, t)));
+    E.forEach(([a, b]) => svg.append(el("line", { x1: N[a][0], y1: N[a][1] - 21, x2: N[b][0], y2: N[b][1] + 60, class: inside(b, sel) ? "below" : "" })));  // from the top of the lower circle to below the upper one's label
+    for (const k in N) {
+      const [x, y, name] = N[k], d = val[k], on = inside(k, sel);
+      const g = el("g", { class: "node", tabindex: 0, role: "radio", "aria-checked": k === sel, "aria-label": `${name}, defect ${f2(d)}`, opacity: on ? 1 : .6 });
+      g.append(el("circle", { cx: x, cy: y, r: 26, fill: "transparent" }));
+      if (k === sel) g.append(el("circle", { cx: x, cy: y, r: 19, fill: "none", stroke: "var(--ink)", "stroke-width": 2 }));
+      g.append(el("circle", { class: "dot", cx: x, cy: y, r: 13, style: `fill:${k === sel ? "var(--cool)" : on ? "color-mix(in srgb, var(--cool) 50%, var(--panel))" : "color-mix(in srgb, var(--muted) 30%, var(--panel))"}` }));  // the chosen subgroup, the subgroups inside it, and the rest
+      g.append(el("text", { x, y: y + 37, "text-anchor": "middle", class: "v", style: "paint-order:stroke;stroke:var(--panel);stroke-width:5px" }, f2(d)));
+      g.append(el("text", { x, y: y + 52, "text-anchor": "middle", class: "n", style: "paint-order:stroke;stroke:var(--panel);stroke-width:5px" }, name));
+      const pick = () => { sel = k; draw(); svg.querySelector('.node[aria-checked="true"]').focus({ preventScroll: true }); };
+      g.addEventListener("click", pick); g.addEventListener("keydown", e => { if (e.key === " " || e.key === "Enter") { pick(); e.preventDefault(); } });
+      svg.append(g);
+    }
+    const n = els[sel].length, below = Object.keys(N).filter(k => k !== sel && inside(k, sel)).length;
+    const box = $("#hasseSel"); box.innerHTML = `<p><b>${N[sel][2][0].toUpperCase() + N[sel][2].slice(1)}</b>: ${n} ${n === 1 ? "transformation" : "transformations"}, defect <b class="num">${f2(val[sel])}</b>. ${below ? `Inside it, in blue: ${Object.keys(N).filter(k => k !== sel && inside(k, sel)).map(k => `${N[k][2]} <span class="num">${f2(val[k])}</span>`).join(", ")}; each is at most ${f2(val[sel])}.` : "No subgroup lies inside it."} <span class="muted">Click a circle to choose another.</span></p>`;
+    const gl = document.createElement("div"); gl.className = "glyphs";
+    els[sel].forEach(x => { const fig = document.createElement("figure"); fig.append(glyph(x)); fig.append(NAME[x]); gl.append(fig); });
+    box.append(gl);
+  }
+  draw();
+  const sx = svg.parentElement; sx.scrollLeft = (sx.scrollWidth - sx.clientWidth) / 2;  // on a narrow screen, start at the middle of the diagram
+})();
+
+/* ---------- memorizer ring ---------- */
+let K = 8, S = 2;  // poses on the orbit, and how many of them, clockwise from the top, were seen
+const setSeen = n => { S = Math.max(0, Math.min(K, n)); renderRing(); };
+function renderRing() {
+  const svg = $("#ring"); svg.innerHTML = ""; const R = 128, c = 180, d = Math.sqrt(1 - S / K);
+  svg.append(el("circle", { cx: c, cy: c, r: R, fill: "none", stroke: css("--line"), "stroke-width": 1.5 }));
+  // the seen poses as an arc, clockwise from the top
+  if (S === K) svg.append(el("circle", { cx: c, cy: c, r: R, fill: "none", stroke: css("--ink"), "stroke-width": 4 }));
+  else if (S > 1) { const e = 2 * Math.PI * (S - 1) / K; svg.append(el("path", { d: `M${c} ${c - R}A${R} ${R} 0 ${e > Math.PI ? 1 : 0} 1 ${c + R * Math.sin(e)} ${c - R * Math.cos(e)}`, fill: "none", stroke: css("--ink"), "stroke-width": 4, "stroke-linecap": "round" })); }
+  // the defect as a filled share of an inner disc
+  const a = 2 * Math.PI * d, r = 62, big = d > .5 ? 1 : 0;
+  svg.append(el("circle", { cx: c, cy: c, r, fill: css("--sound"), "fill-opacity": .18 }));
+  if (d > .999) svg.append(el("circle", { cx: c, cy: c, r, fill: css("--cheat"), "fill-opacity": .85 }));
+  else if (d > 0) svg.append(el("path", { d: `M${c} ${c}L${c} ${c - r}A${r} ${r} 0 ${big} 1 ${c + r * Math.sin(a)} ${c - r * Math.cos(a)}Z`, fill: css("--cheat"), "fill-opacity": .85 }));
+  svg.append(el("text", { x: c, y: c + 6, "text-anchor": "middle", "font-size": 15, "font-weight": 600 }, "defect"));
+  for (let i = 0; i < K; i++) {
+    const t = 2 * Math.PI * i / K, x = c + R * Math.sin(t), y = c - R * Math.cos(t), on = i < S;
+    const g = el("g", { class: "pose", tabindex: 0, role: "button", "aria-label": `seen up to pose ${i + 1} of ${K}` });
+    g.append(el("circle", { cx: x, cy: y, r: 22, fill: "transparent" }));
+    g.append(el("circle", { cx: x, cy: y, r: K > 12 ? 9 : 13, fill: on ? css("--ink") : css("--panel"), stroke: css("--ink"), "stroke-width": 2.2 }));
+    const pick = () => { setSeen(S === i + 1 ? i : i + 1); svg.querySelectorAll(".pose")[i].focus({ preventScroll: true }); };  // clicking the last seen pose unsees it
+    g.addEventListener("click", pick); g.addEventListener("keydown", e => { if (e.key === " " || e.key === "Enter") { pick(); e.preventDefault(); } });
+    svg.append(g);
+  }
+  const sl = $("#seenSlider"); sl.max = K; sl.value = S; sl.setAttribute("aria-valuetext", `${S} of ${K} poses seen`);
+  $("#sN").textContent = S; $("#kN").textContent = K; $("#dN").textContent = f3(d); $("#dN").style.color = d < 1e-9 ? css("--sound") : css("--cheat");
+  $("#ringNote").textContent = S === K ? "Every pose seen: invariant on this orbit." : S === 0 ? "No pose seen: nothing learned on this orbit." : `${S} of ${K} poses seen.`;
+}
+$("#seenSlider").addEventListener("input", e => setSeen(+e.target.value));
+[4, 8, 12, 24].forEach(k => { const b = document.createElement("button"); b.className = "chip"; b.textContent = k + " poses"; b.setAttribute("aria-pressed", k === K); b.onclick = () => { const share = S / K; K = k; S = Math.round(share * k); document.querySelectorAll("#kchips .chip").forEach(x => x.setAttribute("aria-pressed", x === b)); renderRing(); }; $("#kchips").append(b); });
+
+/* ---------- accuracy by model ---------- */
+const ROWS = [["plain", "MLP"], ["f_S", "Bayes rule, training distribution"], ["spec_long", "spectral features"], ["aug", "MLP, rotated inputs"], ["pool", "feature pooling"], ["lse", "log-mean-exp head"], ["f_star", "Bayes rule, deployment"]];  // the invariant arms from lowest to highest
+function renderArms(animate) {
+  const svg = $("#arms"); svg.innerHTML = ""; const x0 = 290, x1 = 700, X = v => x0 + (x1 - x0) * v, top = 34, step = 38;
+  const ax = el("g", { class: "axis" });
+  [0, .25, .5, .75, 1].forEach(v => { ax.append(el("line", { x1: X(v), y1: top - 14, x2: X(v), y2: top + step * ROWS.length - 12 }), el("text", { x: X(v), y: top + step * ROWS.length + 6, "text-anchor": "middle" }, v.toFixed(2))); });
+  ax.append(el("text", { x: X(.5), y: top + step * ROWS.length + 24, "text-anchor": "middle" }, "accuracy (share of inputs classified correctly)"));
+  svg.append(ax);
+  ROWS.forEach(([k, name], i) => {
+    const A = D.rotation.arms[k], y = top + i * step, drop = A.train - A.full, col = drop > .05 ? css("--cheat") : css("--sound"), rule = k.startsWith("f_");
+    const g = el("g", { class: "row" }); g.append(el("title", {}, `${name}: ${f3(A.train)} on inputs similar to the training data, ${f3(A.full)} over the full circle (means of three runs${k === "spec_long" ? `; trained ${D.rotation.epochs_spec_long} epochs, the others ${D.rotation.epochs}` : ""})`));
+    g.append(el("text", { x: x0 - 18, y: y + 5, "text-anchor": "end", class: "lab", "font-style": rule ? "italic" : "normal" }, name));
+    const len = Math.abs(X(A.train) - X(A.full));
+    const ln = el("line", { class: "link", x1: X(A.train), y1: y, x2: X(A.full), y2: y, stroke: col, "stroke-dasharray": len, "stroke-dashoffset": animate ? len : 0 }); g.append(ln);
+    g.append(el("circle", { cx: X(A.train), cy: y, r: 7, fill: css("--panel"), stroke: col, "stroke-width": 2.5 }));
+    g.append(el("circle", { cx: X(A.full), cy: y, r: 7, fill: col, stroke: css("--panel"), "stroke-width": 2 }));
+    g.append(el("text", { x: Math.max(X(A.train), X(A.full)) + 14, y: y + 4.5, class: "val" }, drop > .05 ? `${f3(A.train)} → ${f3(A.full)}` : f3(A.full)));
+    svg.append(g); if (animate) requestAnimationFrame(() => setTimeout(() => ln.setAttribute("stroke-dashoffset", 0), 120 * i));
+  });
+}
+
+/* ---------- fine-tuning ---------- */
+function cmp(box, rows, scale, color) { box.innerHTML = rows.map(([name, v, txt]) => `<div class="cmprow"><span>${name}</span><span class="track"><span data-w="${100 * v / scale}" style="background:${color(v)}"></span></span><b>${txt}</b></div>`).join(""); }
+function renderFT() {
+  const F = D.finetune, P = F.PAPER;
+  cmp($("#ftDefect"), [["published recipe", F.control_v[0], f3(F.control_v[0])], ["all four flips + consistency", F.four_flips_v[0], f3(F.four_flips_v[0])]], .6, v => v > .35 ? css("--cheat") : css("--gold"));
+  cmp($("#ftAcc"), [["published recipe", P.acc_v_control, pct(P.acc_v_control)], ["all four flips + consistency", P.acc_v_four_flips, pct(P.acc_v_four_flips)]], 1, v => v > .4 ? css("--sound") : css("--cheat"));
+  $("#ftRatio").textContent = `${f3(P.ratio[0])} [${f3(P.ratio[1])}, ${f3(P.ratio[2])}]`;
+  $("#ftCost").textContent = `It is not free: upright accuracy on the 80 classes is ${pct(P.upright_four_flips)}, against ${pct(P.upright_control)} with the published recipe.`;
+}
+const fillBars = root => root.querySelectorAll("[data-w]").forEach(s => s.style.width = s.dataset.w + "%");
+
+/* ---------- render, reveal ---------- */
+function renderAll() { renderDet(); renderPlay(); renderRing(); renderArms(false); renderFT(); fillBars(document); }
+renderDet(); renderPlay(); renderRing(); renderFT();
+const once = { tiles: showTiles, arms: () => renderArms(!reduce), ftDefect: () => fillBars($("#ftDefect")), ftAcc: () => fillBars($("#ftAcc")) };
+const io = new IntersectionObserver(es => es.forEach(e => { if (!e.isIntersecting) return; e.target.classList.add("in"); const id = e.target.id || (e.target.querySelector("[id]") || {}).id; for (const k in once) if (e.target.id === k || e.target.querySelector("#" + k)) { once[k](); delete once[k]; } io.unobserve(e.target); }), { threshold: .18 });
+document.querySelectorAll(".reveal").forEach(n => io.observe(n));
+})();
+</script>
+</body>
+</html>
